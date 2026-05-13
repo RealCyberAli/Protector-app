@@ -1,68 +1,72 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, FlatList, TouchableOpacity, Alert } from 'react-native';
-import * as SQLite from 'expo-sqlite';
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useTheme, mono } from '../src/theme';
+import { getDb, initDb } from '../src/db';
 import { useRouter } from 'expo-router';
-import { theme } from '../src/theme';
 
 export default function Index() {
+  const { colors } = useTheme();
   const [search, setSearch] = useState('');
-  const [phones, setPhones] = useState([]);
+  const [results, setResults] = useState<any[]>([]);
   const router = useRouter();
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    initDb().then(() => fetchModels());
+  }, []);
 
-  const loadData = async (text = "") => {
-    const db = await SQLite.openDatabaseAsync('protectors.db');
-    const results = text 
-      ? await db.getAllAsync("SELECT * FROM protectors WHERE model LIKE ?", [`%${text}%`])
-      : await db.getAllAsync("SELECT * FROM protectors");
-    setPhones(results);
+  const fetchModels = async (text = '') => {
+    const db = await getDb();
+    const query = text 
+      ? await db.getAllAsync('SELECT * FROM protectors WHERE model LIKE ?', [`%${text}%`])
+      : await db.getAllAsync('SELECT * FROM protectors');
+    setResults(query);
   };
 
-  const checkCompatibility = async (item) => {
-    const db = await SQLite.openDatabaseAsync('protectors.db');
+  const showMatches = async (item: any) => {
+    const db = await getDb();
     const matches = await db.getAllAsync(
-      "SELECT * FROM protectors WHERE (pid = ? OR (notch = ? AND size BETWEEN ? AND ?)) AND id != ?",
-      [item.pid, item.notch, item.size - 0.05, item.size + 0.05, item.id]
+      'SELECT * FROM protectors WHERE pid = ? AND id != ?',
+      [item.pid, item.id]
     );
-
+    
     const message = matches.length > 0 
-      ? matches.map(m => `• ${m.brand} ${m.model}`).join("\n")
+      ? matches.map((m: any) => `• ${m.brand} ${m.model}`).join('\n')
       : "No direct matches found.";
-    Alert.alert(`Matches for ${item.model}:`, message);
+    Alert.alert(`COMPATIBILITY: ${item.model}`, message);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>PROTECTOR_MATCHER</Text>
-        <Text style={styles.label}>OFFLINE_DATABASE_V1.0</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.h1, { color: colors.textPrimary }]}>PROTECTOR_MATCHER</Text>
       
-      <TextInput 
-        style={styles.searchBar}
+      <TextInput
+        style={[styles.search, { backgroundColor: colors.inputBg, color: colors.textPrimary, borderColor: colors.accent }]}
         placeholder="SEARCH_MODEL..."
-        placeholderTextColor={theme.colors.text_secondary}
-        onChangeText={(t) => { setSearch(t); loadData(t); }}
+        placeholderTextColor={colors.textSecondary}
+        onChangeText={(t) => { setSearch(t); fetchModels(t); }}
       />
 
-      <FlatList 
-        data={phones}
+      <FlatList
+        data={results}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => checkCompatibility(item)}>
+          <TouchableOpacity 
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => showMatches(item)}
+          >
             <View>
-              <Text style={styles.modelText}>{item.brand.toUpperCase()} {item.model.toUpperCase()}</Text>
-              <Text style={styles.specText}>{item.size} INCH // {item.notch.toUpperCase()}</Text>
+              <Text style={[styles.model, { color: colors.textPrimary }]}>{item.brand} {item.model}</Text>
+              <Text style={[styles.specs, { color: colors.textSecondary }]}>{item.size}" // {item.notch}</Text>
             </View>
-            <View style={styles.pidBadge}>
-              <Text style={styles.pidText}>{item.pid}</Text>
-            </View>
+            <Text style={[styles.pid, { color: colors.accent }]}>{item.pid}</Text>
           </TouchableOpacity>
         )}
       />
 
-      {/* Neo-Brutalist FAB with the specific shadow from your guidelines */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/add')}>
+      <TouchableOpacity 
+        style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.shadow }]}
+        onPress={() => router.push('/add')}
+      >
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
     </View>
@@ -70,22 +74,13 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 20, paddingTop: 60 },
-  header: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingBottom: 10 },
-  title: { color: theme.colors.text_primary, fontSize: 28, fontWeight: '900', letterSpacing: -1 },
-  label: { color: theme.colors.accent, fontFamily: theme.fonts.mono, fontSize: 10, tracking: 2 },
-  searchBar: { backgroundColor: theme.colors.surface, color: theme.colors.text_primary, padding: 15, fontSize: 18, fontFamily: theme.fonts.mono, borderBottomWidth: 2, borderBottomColor: theme.colors.accent },
-  card: { backgroundColor: theme.colors.surface, padding: 20, marginBottom: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  modelText: { color: theme.colors.text_primary, fontSize: 16, fontWeight: 'bold' },
-  specText: { color: theme.colors.text_secondary, fontFamily: theme.fonts.mono, fontSize: 12, marginTop: 4 },
-  pidText: { color: theme.colors.accent, fontFamily: theme.fonts.mono, fontSize: 10, fontWeight: 'bold' },
-  fab: { 
-    position: 'absolute', bottom: 30, right: 30, 
-    backgroundColor: theme.colors.accent, width: 60, height: 60, 
-    alignItems: 'center', justifyContent: 'center',
-    // Neo-brutalist shadow from guidelines
-    shadowColor: "#FFFFFF", shadowOffset: { width: 4, height: 4 }, shadowOpacity: 0.2, shadowRadius: 0,
-    elevation: 5
-  },
+  container: { flex: 1, padding: 20, paddingTop: 60 },
+  h1: { fontSize: 28, fontWeight: '900', letterSpacing: -1, marginBottom: 20 },
+  search: { height: 50, paddingHorizontal: 15, fontFamily: mono, borderBottomWidth: 2, marginBottom: 20 },
+  card: { padding: 15, marginBottom: 1, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  model: { fontSize: 16, fontWeight: 'bold' },
+  specs: { fontSize: 12, fontFamily: mono, marginTop: 4 },
+  pid: { fontSize: 10, fontFamily: mono, fontWeight: 'bold' },
+  fab: { position: 'absolute', bottom: 30, right: 30, width: 60, height: 60, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0, elevation: 5 },
   fabIcon: { color: 'white', fontSize: 30, fontWeight: 'bold' }
 });
