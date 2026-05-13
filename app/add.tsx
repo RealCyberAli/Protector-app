@@ -2,43 +2,46 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { useRouter } from 'expo-router';
+import { theme } from '../src/theme';
 
 export default function AddScreen() {
   const [form, setForm] = useState({ brand: '', model: '', size: '', notch: '', pid: '' });
   const router = useRouter();
 
   const save = async () => {
-    if (!form.brand || !form.model) return Alert.alert("Error", "Fill in Brand and Model");
     const db = await SQLite.openDatabaseAsync('protectors.db');
-    await db.runAsync(
-      "INSERT INTO protectors (brand, model, size, notch, pid) VALUES (?, ?, ?, ?, ?)",
-      [form.brand, form.model, parseFloat(form.size) || 0, form.notch, form.pid]
-    );
-    Alert.alert("Success", "Model saved!");
+    await db.runAsync("INSERT INTO protectors (brand, model, size, notch, pid) VALUES (?, ?, ?, ?, ?)", [form.brand, form.model, parseFloat(form.size) || 0, form.notch, form.pid]);
+    Alert.alert("DATA_SAVED", "Database updated successfully.");
     router.back();
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Add New Model</Text>
-      <TextInput placeholder="Brand (e.g. Vivo)" style={styles.input} placeholderTextColor="#666" onChangeText={t => setForm({...form, brand: t})} />
-      <TextInput placeholder="Model (e.g. Y20)" style={styles.input} placeholderTextColor="#666" onChangeText={t => setForm({...form, model: t})} />
-      <TextInput placeholder="Screen Size (e.g. 6.51)" keyboardType="numeric" style={styles.input} placeholderTextColor="#666" onChangeText={t => setForm({...form, size: t})} />
-      <TextInput placeholder="Notch Type" style={styles.input} placeholderTextColor="#666" onChangeText={t => setForm({...form, notch: t})} />
-      <TextInput placeholder="Protector ID (PID)" style={styles.input} placeholderTextColor="#666" onChangeText={t => setForm({...form, pid: t})} />
-      
+      <Text style={styles.title}>NEW_ENTRY</Text>
+      {['brand', 'model', 'size', 'notch', 'pid'].map((field) => (
+        <View key={field} style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{field.toUpperCase()}</Text>
+          <TextInput 
+            style={styles.input} 
+            placeholder={`ENTER_${field.toUpperCase()}`} 
+            placeholderTextColor="#444"
+            onChangeText={t => setForm({...form, [field]: t})} 
+          />
+        </View>
+      ))}
       <TouchableOpacity style={styles.button} onPress={save}>
-        <Text style={styles.buttonText}>Save Phone Data</Text>
+        <Text style={styles.buttonText}>COMMIT_TO_DATABASE</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.back()} style={{marginTop: 20}}><Text style={{color: '#888', textAlign: 'center'}}>Cancel</Text></TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0c0c0c', padding: 25, paddingTop: 80 },
-  title: { color: 'white', fontSize: 24, fontWeight: 'bold', marginBottom: 30 },
-  input: { backgroundColor: '#1a1a1a', color: 'white', padding: 15, borderRadius: 10, marginBottom: 15 },
-  button: { backgroundColor: '#007AFF', padding: 18, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 30, paddingTop: 80 },
+  title: { color: theme.colors.text_primary, fontSize: 32, fontWeight: '900', marginBottom: 40 },
+  inputGroup: { marginBottom: 20 },
+  inputLabel: { color: theme.colors.text_secondary, fontFamily: theme.fonts.mono, fontSize: 10, marginBottom: 5 },
+  input: { backgroundColor: theme.colors.surface, color: theme.colors.text_primary, padding: 15, fontFamily: theme.fonts.mono, borderLeftWidth: 3, borderLeftColor: theme.colors.border },
+  button: { backgroundColor: theme.colors.accent, padding: 20, marginTop: 20, alignItems: 'center' },
+  buttonText: { color: 'white', fontWeight: 'bold', fontFamily: theme.fonts.mono }
 });
